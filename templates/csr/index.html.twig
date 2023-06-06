@@ -1,58 +1,148 @@
-{# templates/csr/index.html.twig #}
 {% extends 'base.html.twig' %}
 
-{% block title %}Generate CSR{% endblock %}
+{% block title %}CSR Generator{% endblock %}
 
 {% block body %}
-    <div class="container">
-        <h1 class="mt-4 mb-4">Generate Certificate Signing Request (CSR)</h1>
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl mb-4">Generate CSR</h1>
 
-        {% for message in app.flashes('error') %}
-            <div class="alert alert-danger">
-                {{ message }}
-            </div>
+        {# Display any flash messages #}
+        {% for label, messages in app.flashes %}
+            {% for message in messages %}
+                <div class="alert alert-{{ label }} mb-4 p-4 border rounded">
+                    {{ message }}
+                </div>
+            {% endfor %}
         {% endfor %}
 
-        {{ form_start(form, {'attr': {'data-turbo': 'false'}}) }}
-            <div class="row">
-                <div class="col-md-6">
+        {# CSR Generation Form #}
+        <div class="mb-8">
+            {{ form_start(form, {'attr': {'id': 'csr-form'}}) }}
+                <div class="grid gap-4">
                     {{ form_row(form.commonName) }}
-                </div>
-                <div class="col-md-6">
                     {{ form_row(form.organization) }}
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-md-6">
                     {{ form_row(form.organizationalUnit) }}
-                </div>
-                <div class="col-md-6">
-                    {{ form_row(form.email) }}
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-md-4">
                     {{ form_row(form.locality) }}
-                </div>
-                <div class="col-md-4">
                     {{ form_row(form.state) }}
-                </div>
-                <div class="col-md-4">
                     {{ form_row(form.country) }}
-                </div>
-            </div>
-            <div class="row">
-                <div class="col-md-6">
+                    {{ form_row(form.email) }}
                     {{ form_row(form.keySize) }}
                 </div>
-            </div>
-            <button type="submit" class="btn btn-primary mt-3 mb-4">Generate CSR</button>
-        {{ form_end(form) }}
 
-        {% if csrOutput is defined and csrOutput is not empty %}
-            <script>
-                console.log('CSR Output:', {{ csrOutput|json_encode|raw }});
-            </script>
-        {% endif %}
+                <div class="mt-4">
+                    <button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded">
+                        Generate CSR
+                    </button>
+                </div>
+            {{ form_end(form) }}
+        </div>
+
+        {# CSR Output Area #}
+        <div id="csr-output" class="mt-8">
+            {% if csrOutput is defined and csrOutput %}
+                <h2 class="text-xl mb-4">Generated CSR</h2>
+                <pre class="bg-gray-100 p-4 rounded overflow-x-auto">{{ csrOutput }}</pre>
+            {% endif %}
+        </div>
+
+        {# Stored CSRs List #}
+        <div class="mt-8">
+            <h2 class="text-xl mb-4">Stored CSRs</h2>
+            <div id="csr-list" class="space-y-4"></div>
+        </div>
     </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const csrForm = document.getElementById('csr-form');
+            const csrList = document.getElementById('csr-list');
+            const CSR_STORAGE_KEY = 'stored_csrs';
+
+            function getStoredCSRs() {
+                const stored = localStorage.getItem(CSR_STORAGE_KEY);
+                return stored ? JSON.parse(stored) : [];
+            }
+
+            function saveCSR(csrData) {
+                const csrs = getStoredCSRs();
+                csrs.push({
+                    id: Date.now(),
+                    data: csrData,
+                    timestamp: new Date().toISOString()
+                });
+                localStorage.setItem(CSR_STORAGE_KEY, JSON.stringify(csrs));
+                updateCSRList();
+                console.log('CSR saved:', csrData); // Debug output
+            }
+
+            function updateCSRList() {
+                const csrs = getStoredCSRs();
+                csrList.innerHTML = csrs.map(csr => `
+                    <div class="border p-4 rounded">
+                        <div class="flex justify-between">
+                            <div>
+                                <strong>${csr.data.metadata.commonName}</strong>
+                                <div class="text-sm text-gray-600">
+                                    ${csr.data.metadata.organization} (${csr.data.metadata.country})
+                                </div>
+                                <div class="text-sm text-gray-500">
+                                    Created: ${new Date(csr.timestamp).toLocaleString()}
+                                </div>
+                            </div>
+                            <button onclick="deleteCSR(${csr.id})" 
+                                    class="text-red-500 hover:text-red-700">
+                                Delete
+                            </button>
+                        </div>
+                        <pre class="mt-2 bg-gray-50 p-2 rounded text-sm overflow-x-auto">${csr.data.csr}</pre>
+                    </div>
+                `).join('');
+            }
+
+            if (csrForm) {
+                csrForm.addEventListener('submit', function(e) {
+                    e.preventDefault();
+                    
+                    const formData = new FormData(this);
+                    fetch(this.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-Requested-With': 'XMLHttpRequest'
+                        }
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            console.log('Received CSR data:', data); // Debug output
+                            saveCSR(data);
+                            document.getElementById('csr-output').innerHTML = `
+                                <h2 class="text-xl mb-4">Generated CSR</h2>
+                                <pre class="bg-gray-100 p-4 rounded overflow-x-auto">${data.csr}</pre>
+                            `;
+                        } else {
+                            throw new Error(data.error || 'Failed to generate CSR');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        alert(error.message);
+                    });
+                });
+            }
+
+            // Initialize stored CSRs display
+            updateCSRList();
+
+            // Make deleteCSR function available globally
+            window.deleteCSR = function(id) {
+                const csrs = getStoredCSRs().filter(csr => csr.id !== id);
+                localStorage.setItem(CSR_STORAGE_KEY, JSON.stringify(csrs));
+                updateCSRList();
+            };
+        });
+    </script>
 {% endblock %}
