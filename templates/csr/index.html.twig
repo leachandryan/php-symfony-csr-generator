@@ -1,0 +1,58 @@
+{# templates/csr/index.html.twig #}
+{% extends 'base.html.twig' %}
+
+{% block title %}Generate CSR{% endblock %}
+
+{% block body %}
+    <div class="container">
+        <h1 class="mt-4 mb-4">Generate Certificate Signing Request (CSR)</h1>
+
+        {% for message in app.flashes('error') %}
+            <div class="alert alert-danger">
+                {{ message }}
+            </div>
+        {% endfor %}
+
+        {{ form_start(form, {'attr': {'data-turbo': 'false'}}) }}
+            <div class="row">
+                <div class="col-md-6">
+                    {{ form_row(form.commonName) }}
+                </div>
+                <div class="col-md-6">
+                    {{ form_row(form.organization) }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    {{ form_row(form.organizationalUnit) }}
+                </div>
+                <div class="col-md-6">
+                    {{ form_row(form.email) }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-4">
+                    {{ form_row(form.locality) }}
+                </div>
+                <div class="col-md-4">
+                    {{ form_row(form.state) }}
+                </div>
+                <div class="col-md-4">
+                    {{ form_row(form.country) }}
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-md-6">
+                    {{ form_row(form.keySize) }}
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3 mb-4">Generate CSR</button>
+        {{ form_end(form) }}
+
+        {% if csrOutput is defined and csrOutput is not empty %}
+            <script>
+                console.log('CSR Output:', {{ csrOutput|json_encode|raw }});
+            </script>
+        {% endif %}
+    </div>
+{% endblock %}
