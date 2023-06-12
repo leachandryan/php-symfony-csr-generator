@@ -17,15 +17,15 @@
             top: 0;
             background-color: white;
             z-index: 1;
-            text-align: center;  /* Center header text */
+            text-align: center;
         }
         .csr-table td {
-            text-align: center;  /* Center cell content */
-            vertical-align: middle;  /* Vertically center content */
+            text-align: center;
+            vertical-align: middle;
         }
         .action-buttons {
             display: flex;
-            gap: 1rem;  /* Increased gap between buttons */
+            gap: 1rem;
             justify-content: center;
         }
     </style>
@@ -35,7 +35,7 @@
     <div class="container mx-auto p-4">
         <h1 class="text-2xl mb-4">Generate CSR</h1>
 
-        {# Form section - unchanged #}
+        {# Form section #}
         <div class="mb-8">
             {{ form_start(form, {'attr': {'id': 'csr-form'}}) }}
                 <div class="grid gap-4">
@@ -46,7 +46,8 @@
                     {{ form_row(form.state) }}
                     {{ form_row(form.country) }}
                     {{ form_row(form.email) }}
-                    {{ form_row(form.keySize) }}
+                    {{ form_row(form.keyType) }}
+                    {{ form_row(form.keyConfig) }}
                 </div>
 
                 <div class="mt-4">
@@ -63,17 +64,55 @@
             <div id="csr-list" class="table-container"></div>
         </div>
     </div>
-{% endblock %}
 
-{% block javascripts %}
-    {{ parent() }}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const csrForm = document.getElementById('csr-form');
             const csrList = document.getElementById('csr-list');
             const CSR_STORAGE_KEY = 'stored_csrs';
 
-            // Previous functions remain the same
+            // Define key configurations
+            const keyConfigs = {
+                'rsa': {
+                    '2048': 'RSA 2048 bits (Standard)',
+                    '3072': 'RSA 3072 bits (NIST 2030+)',
+                    '4096': 'RSA 4096 bits (Extra Secure)'
+                },
+                'ecc': {
+                    'prime256v1': 'ECC prime256v1 (Standard)',
+                    'secp384r1': 'ECC secp384r1 (More Secure)',
+                    'secp521r1': 'ECC secp521r1 (Extra Secure)'
+                }
+            };
+
+            // Key type change handler
+            const keyTypeSelect = document.querySelector('.key-type-select');
+            const keyConfigSelect = document.querySelector('.key-config-select');
+
+            if (keyTypeSelect && keyConfigSelect) {
+                keyTypeSelect.addEventListener('change', function() {
+                    const selectedType = this.value;
+                    const configs = keyConfigs[selectedType];
+                    
+                    // Clear current options
+                    keyConfigSelect.innerHTML = '';
+                    
+                    // Add new options
+                    Object.entries(configs).forEach(([value, label]) => {
+                        const option = document.createElement('option');
+                        option.value = value;
+                        option.textContent = label;
+                        keyConfigSelect.appendChild(option);
+                    });
+
+                    // Update the label
+                    const label = keyConfigSelect.closest('.form-group').querySelector('label');
+                    if (label) {
+                        label.textContent = selectedType === 'rsa' ? 'Key Size' : 'Curve';
+                    }
+                });
+            }
+
             function getStoredCSRs() {
                 const stored = localStorage.getItem(CSR_STORAGE_KEY);
                 return stored ? JSON.parse(stored) : [];
@@ -88,6 +127,7 @@
                 });
                 localStorage.setItem(CSR_STORAGE_KEY, JSON.stringify(csrs));
                 updateCSRList();
+                console.log('CSR saved:', csrData);
             }
 
             async function copyToClipboard(text) {
@@ -119,7 +159,8 @@
                                 <th class="px-6 py-3">State</th>
                                 <th class="px-6 py-3">Country</th>
                                 <th class="px-6 py-3">Email</th>
-                                <th class="px-6 py-3">Key Size</th>
+                                <th class="px-6 py-3">Key Type</th>
+                                <th class="px-6 py-3">Key Config</th>
                                 <th class="px-6 py-3">Created</th>
                                 <th class="px-6 py-3">Actions</th>
                             </tr>
@@ -134,7 +175,8 @@
                                     <td class="px-6 py-3">${csr.data.metadata.state || '-'}</td>
                                     <td class="px-6 py-3">${csr.data.metadata.country}</td>
                                     <td class="px-6 py-3">${csr.data.metadata.email || '-'}</td>
-                                    <td class="px-6 py-3">${csr.data.metadata.keySize}</td>
+                                    <td class="px-6 py-3">${csr.data.metadata.keyType}</td>
+                                    <td class="px-6 py-3">${csr.data.metadata.keyConfig}</td>
                                     <td class="px-6 py-3">${new Date(csr.timestamp).toLocaleString()}</td>
                                     <td class="px-6 py-3">
                                         <div class="action-buttons">
@@ -155,7 +197,6 @@
                 `;
             }
 
-            // Form submission handler remains the same
             if (csrForm) {
                 csrForm.addEventListener('submit', function(e) {
                     e.preventDefault();
@@ -186,7 +227,7 @@
             // Initialize stored CSRs display
             updateCSRList();
 
-            // Global functions remain the same
+            // Global functions for copy and delete
             window.deleteCSR = function(id) {
                 if (confirm('Are you sure you want to delete this CSR?')) {
                     const csrs = getStoredCSRs().filter(csr => csr.id !== id);

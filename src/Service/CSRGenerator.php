@@ -1,5 +1,5 @@
 <?php
-// src/Service/CSRGenerator.php
+
 namespace App\Service;
 
 use App\DTO\CSRData;
@@ -14,11 +14,21 @@ class CSRGenerator
 
     public function generate(CSRData $data): string
     {
+        // Configure key options
+        if ($data->keyType === 'rsa') {
+            $config = [
+                'private_key_type' => OPENSSL_KEYTYPE_RSA,
+                'private_key_bits' => (int)$data->keyConfig
+            ];
+        } else {
+            $config = [
+                'private_key_type' => OPENSSL_KEYTYPE_EC,
+                'curve_name' => $data->keyConfig
+            ];
+        }
+
         // Generate private key
-        $privateKey = openssl_pkey_new([
-            "private_key_bits" => (int)$data->keySize,
-            "private_key_type" => OPENSSL_KEYTYPE_RSA,
-        ]);
+        $privateKey = openssl_pkey_new($config);
 
         if ($privateKey === false) {
             $error = openssl_error_string();
@@ -27,7 +37,7 @@ class CSRGenerator
         }
 
         // Create CSR
-        $dn = [
+        $dn = array_filter([
             "commonName" => $data->commonName,
             "organizationName" => $data->organization,
             "organizationalUnitName" => $data->organizationalUnit,
@@ -35,7 +45,7 @@ class CSRGenerator
             "stateOrProvinceName" => $data->state,
             "countryName" => $data->country,
             "emailAddress" => $data->email,
-        ];
+        ]);
 
         $csr = openssl_csr_new($dn, $privateKey);
         

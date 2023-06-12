@@ -20,7 +20,7 @@ class CSRController extends AbstractController
         $this->csrGenerator = $csrGenerator;
     }
 
-    #[Route('/csr', name: 'app_csr')]
+    #[Route('/', name: 'app_csr', methods: ['GET', 'POST'])]
     public function index(Request $request): Response
     {
         $csrData = new CSRData();
@@ -44,15 +44,11 @@ class CSRController extends AbstractController
                             'state' => $csrData->state,
                             'country' => $csrData->country,
                             'email' => $csrData->email,
-                            'keySize' => $csrData->keySize
+                            'keyType' => $csrData->keyType,
+                            'keyConfig' => $csrData->keyConfig
                         ]
                     ]);
                 }
-                
-                return $this->render('csr/index.html.twig', [
-                    'form' => $form->createView(),
-                    'csrOutput' => $csrOutput
-                ]);
             } catch (\Exception $e) {
                 if ($request->isXmlHttpRequest()) {
                     return new JsonResponse([
@@ -62,6 +58,16 @@ class CSRController extends AbstractController
                 }
                 $this->addFlash('error', $e->getMessage());
             }
+        } elseif ($form->isSubmitted() && $request->isXmlHttpRequest()) {
+            // Return form errors as JSON
+            $errors = [];
+            foreach ($form->getErrors(true) as $error) {
+                $errors[] = $error->getMessage();
+            }
+            return new JsonResponse([
+                'success' => false,
+                'error' => implode(', ', $errors)
+            ], 400);
         }
 
         return $this->render('csr/index.html.twig', [

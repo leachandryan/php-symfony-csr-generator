@@ -27,6 +27,16 @@ class CSRData
     #[Assert\Email(message: "Please enter a valid email address")]
     public ?string $email = null;
 
-    #[Assert\Choice(choices: ['2048', '4096'])]
-    public string $keySize = '2048';
+    #[Assert\NotBlank(message: "Key type is required")]
+    #[Assert\Choice(choices: ['rsa', 'ecc'])]
+    public string $keyType = 'rsa';
+
+    #[Assert\NotBlank(message: "Key configuration is required")]
+    #[Assert\Choice(choices: [
+        // RSA sizes
+        '2048', '3072', '4096',
+        // ECC curves
+        'prime256v1', 'secp384r1', 'secp521r1'
+    ])]
+    public string $keyConfig = '2048';
 }
