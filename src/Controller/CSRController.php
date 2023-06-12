@@ -39,7 +39,11 @@ class CSRController extends AbstractController
                         'metadata' => [
                             'commonName' => $csrData->commonName,
                             'organization' => $csrData->organization,
+                            'organizationalUnit' => $csrData->organizationalUnit,
+                            'locality' => $csrData->locality,
+                            'state' => $csrData->state,
                             'country' => $csrData->country,
+                            'email' => $csrData->email,
                             'keySize' => $csrData->keySize
                         ]
                     ]);

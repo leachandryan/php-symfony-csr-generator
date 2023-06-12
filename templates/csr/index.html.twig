@@ -2,20 +2,40 @@
 
 {% block title %}CSR Generator{% endblock %}
 
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .table-container {
+            overflow-x: auto;
+        }
+        .csr-table {
+            min-width: 100%;
+            border-collapse: collapse;
+        }
+        .csr-table th {
+            position: sticky;
+            top: 0;
+            background-color: white;
+            z-index: 1;
+            text-align: center;  /* Center header text */
+        }
+        .csr-table td {
+            text-align: center;  /* Center cell content */
+            vertical-align: middle;  /* Vertically center content */
+        }
+        .action-buttons {
+            display: flex;
+            gap: 1rem;  /* Increased gap between buttons */
+            justify-content: center;
+        }
+    </style>
+{% endblock %}
+
 {% block body %}
     <div class="container mx-auto p-4">
         <h1 class="text-2xl mb-4">Generate CSR</h1>
 
-        {# Display any flash messages #}
-        {% for label, messages in app.flashes %}
-            {% for message in messages %}
-                <div class="alert alert-{{ label }} mb-4 p-4 border rounded">
-                    {{ message }}
-                </div>
-            {% endfor %}
-        {% endfor %}
-
-        {# CSR Generation Form #}
+        {# Form section - unchanged #}
         <div class="mb-8">
             {{ form_start(form, {'attr': {'id': 'csr-form'}}) }}
                 <div class="grid gap-4">
@@ -37,18 +57,10 @@
             {{ form_end(form) }}
         </div>
 
-        {# CSR Output Area #}
-        <div id="csr-output" class="mt-8">
-            {% if csrOutput is defined and csrOutput %}
-                <h2 class="text-xl mb-4">Generated CSR</h2>
-                <pre class="bg-gray-100 p-4 rounded overflow-x-auto">{{ csrOutput }}</pre>
-            {% endif %}
-        </div>
-
-        {# Stored CSRs List #}
+        {# Stored CSRs Table #}
         <div class="mt-8">
             <h2 class="text-xl mb-4">Stored CSRs</h2>
-            <div id="csr-list" class="space-y-4"></div>
+            <div id="csr-list" class="table-container"></div>
         </div>
     </div>
 {% endblock %}
@@ -61,6 +73,7 @@
             const csrList = document.getElementById('csr-list');
             const CSR_STORAGE_KEY = 'stored_csrs';
 
+            // Previous functions remain the same
             function getStoredCSRs() {
                 const stored = localStorage.getItem(CSR_STORAGE_KEY);
                 return stored ? JSON.parse(stored) : [];
@@ -75,33 +88,74 @@
                 });
                 localStorage.setItem(CSR_STORAGE_KEY, JSON.stringify(csrs));
                 updateCSRList();
-                console.log('CSR saved:', csrData); // Debug output
+            }
+
+            async function copyToClipboard(text) {
+                try {
+                    await navigator.clipboard.writeText(text);
+                    alert('CSR copied to clipboard!');
+                } catch (err) {
+                    console.error('Failed to copy:', err);
+                    alert('Failed to copy CSR');
+                }
             }
 
             function updateCSRList() {
                 const csrs = getStoredCSRs();
-                csrList.innerHTML = csrs.map(csr => `
-                    <div class="border p-4 rounded">
-                        <div class="flex justify-between">
-                            <div>
-                                <strong>${csr.data.metadata.commonName}</strong>
-                                <div class="text-sm text-gray-600">
-                                    ${csr.data.metadata.organization} (${csr.data.metadata.country})
-                                </div>
-                                <div class="text-sm text-gray-500">
-                                    Created: ${new Date(csr.timestamp).toLocaleString()}
-                                </div>
-                            </div>
-                            <button onclick="deleteCSR(${csr.id})" 
-                                    class="text-red-500 hover:text-red-700">
-                                Delete
-                            </button>
-                        </div>
-                        <pre class="mt-2 bg-gray-50 p-2 rounded text-sm overflow-x-auto">${csr.data.csr}</pre>
-                    </div>
-                `).join('');
+                
+                if (csrs.length === 0) {
+                    csrList.innerHTML = '<p class="text-gray-500 text-center">No CSRs stored yet.</p>';
+                    return;
+                }
+
+                csrList.innerHTML = `
+                    <table class="csr-table">
+                        <thead>
+                            <tr class="bg-gray-50 border-b">
+                                <th class="px-6 py-3">Common Name</th>
+                                <th class="px-6 py-3">Organization</th>
+                                <th class="px-6 py-3">Org Unit</th>
+                                <th class="px-6 py-3">Location</th>
+                                <th class="px-6 py-3">State</th>
+                                <th class="px-6 py-3">Country</th>
+                                <th class="px-6 py-3">Email</th>
+                                <th class="px-6 py-3">Key Size</th>
+                                <th class="px-6 py-3">Created</th>
+                                <th class="px-6 py-3">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${csrs.map(csr => `
+                                <tr class="border-b hover:bg-gray-50">
+                                    <td class="px-6 py-3">${csr.data.metadata.commonName}</td>
+                                    <td class="px-6 py-3">${csr.data.metadata.organization}</td>
+                                    <td class="px-6 py-3">${csr.data.metadata.organizationalUnit || '-'}</td>
+                                    <td class="px-6 py-3">${csr.data.metadata.locality || '-'}</td>
+                                    <td class="px-6 py-3">${csr.data.metadata.state || '-'}</td>
+                                    <td class="px-6 py-3">${csr.data.metadata.country}</td>
+                                    <td class="px-6 py-3">${csr.data.metadata.email || '-'}</td>
+                                    <td class="px-6 py-3">${csr.data.metadata.keySize}</td>
+                                    <td class="px-6 py-3">${new Date(csr.timestamp).toLocaleString()}</td>
+                                    <td class="px-6 py-3">
+                                        <div class="action-buttons">
+                                            <button onclick="copyCSR(${csr.id})" 
+                                                    class="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">
+                                                Copy
+                                            </button>
+                                            <button onclick="deleteCSR(${csr.id})" 
+                                                    class="bg-red-500 text-white px-3 py-1 rounded text-sm hover:bg-red-600">
+                                                Delete
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
             }
 
+            // Form submission handler remains the same
             if (csrForm) {
                 csrForm.addEventListener('submit', function(e) {
                     e.preventDefault();
@@ -117,12 +171,7 @@
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
-                            console.log('Received CSR data:', data); // Debug output
                             saveCSR(data);
-                            document.getElementById('csr-output').innerHTML = `
-                                <h2 class="text-xl mb-4">Generated CSR</h2>
-                                <pre class="bg-gray-100 p-4 rounded overflow-x-auto">${data.csr}</pre>
-                            `;
                         } else {
                             throw new Error(data.error || 'Failed to generate CSR');
                         }
@@ -137,11 +186,20 @@
             // Initialize stored CSRs display
             updateCSRList();
 
-            // Make deleteCSR function available globally
+            // Global functions remain the same
             window.deleteCSR = function(id) {
-                const csrs = getStoredCSRs().filter(csr => csr.id !== id);
-                localStorage.setItem(CSR_STORAGE_KEY, JSON.stringify(csrs));
-                updateCSRList();
+                if (confirm('Are you sure you want to delete this CSR?')) {
+                    const csrs = getStoredCSRs().filter(csr => csr.id !== id);
+                    localStorage.setItem(CSR_STORAGE_KEY, JSON.stringify(csrs));
+                    updateCSRList();
+                }
+            };
+
+            window.copyCSR = function(id) {
+                const csr = getStoredCSRs().find(csr => csr.id === id);
+                if (csr) {
+                    copyToClipboard(csr.data.csr);
+                }
             };
         });
     </script>
